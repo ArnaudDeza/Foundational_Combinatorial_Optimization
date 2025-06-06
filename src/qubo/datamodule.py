@@ -70,7 +70,7 @@ class QUBODataModule(ML_4_Combinatorial_Optimization_DataModule):
                         if sol_np is None:
                             continue
                         obj_val = inst["objective"]
-                        sol_t = torch.from_numpy(sol_np).float()   # (n_i,)
+                        sol_t = torch.tensor(sol_np, dtype=torch.float32)   # (n_i,)
                         obj_f = float(obj_val)
                         data.append((Q_t, sol_t, obj_f, n_i, hash_id))
                     else:
@@ -103,7 +103,7 @@ class QUBODataModule(ML_4_Combinatorial_Optimization_DataModule):
                 - obj_vals   : FloatTensor of shape (N,)
             """
             # Sort by hash_id to ensure ordering
-            if (self.completely_unsupervised == False) or (self.completely_unsupervised and mode == "rw"):
+            if (self.completely_unsupervised == False) or (self.completely_unsupervised and mode == "rw"): 
                 raw_sorted = sorted(raw_data, key=lambda x: x[4])
                 N = len(raw_sorted)
                 max_n = max(item[3] for item in raw_sorted)  # maximum n_i across all instances
@@ -178,12 +178,9 @@ class QUBODataModule(ML_4_Combinatorial_Optimization_DataModule):
             curr_data = []
             print(real_world_folder)
             # Corrected and optimized file searching
-            all_results_files = Path(real_world_folder).rglob("*results*.npy")
-            # Filter them: keep only those containing "_30_results" in their name.
-            # npy_paths will be a list of Path objects.
-            npy_paths = [p for p in all_results_files if "_30_results" in p.name]
-
-            for npy_path in npy_paths: # npy_path is a Path object
+            all_results_files = Path(real_world_folder).rglob("*results*.npy") 
+            
+            for npy_path in all_results_files: # npy_path is a Path object
                 res = np.load(npy_path, allow_pickle=True).item() # Use Path object directly
                 Q = torch.from_numpy(res['Q']).float()       # (n_i, n_i)
                 solution = torch.FloatTensor(res['solution'])      # (n_i, n_i)
