@@ -5,6 +5,7 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 import pickle
+from .loader import load_qap_instance
 
 
 class QAPDataModule(ML_4_Combinatorial_Optimization_DataModule):
@@ -257,4 +258,52 @@ class QAPDataModule(ML_4_Combinatorial_Optimization_DataModule):
             if curr_data:
                 ds = self.build_dense_padded_tensordataset(curr_data, mode="rw")
                 benchmark_ds.append(ds)
+        return benchmark_ds
+    
+    def load_qaplib_instances(self, qaplib_folders) -> Dataset:
+        """
+        Load QAP instances from QAPLIB format files (.dat).
+        
+        Args:
+            qaplib_folders: List of directories containing QAPLIB .dat files
+            
+        Returns:
+            List of datasets, one for each folder
+        """
+        benchmark_ds = []
+        qaplib_hash_id = 0
+        
+        for qaplib_folder in qaplib_folders:
+            curr_data = []
+            print(f"Loading QAPLIB instances from {qaplib_folder}")
+            
+            # Find all .dat files in the folder
+            dat_files = list(Path(qaplib_folder).rglob("*.dat"))
+            
+            for dat_file in dat_files:
+                try:
+                    # Load QAP instance using our loader
+                    F_np, D_np = load_qap_instance(str(dat_file))
+                    
+                    # Convert to tensors
+                    F = torch.from_numpy(F_np).float()
+                    D = torch.from_numpy(D_np).float()
+                    
+                    # For QAPLIB instances, we usually don't have solutions
+                    # This will be unsupervised mode
+                    n_i = F.shape[0]
+                    data_tuple = (F, D, n_i, qaplib_hash_id)
+                    curr_data.append(data_tuple)
+                    qaplib_hash_id += 1
+                    
+                    print(f"Loaded {dat_file.name} (size {n_i})")
+                    
+                except Exception as e:
+                    print(f"Error loading {dat_file}: {e}")
+                    continue
+            
+            if curr_data:
+                ds = self.build_dense_padded_tensordataset(curr_data, mode="synthetic")
+                benchmark_ds.append(ds)
+        
         return benchmark_ds

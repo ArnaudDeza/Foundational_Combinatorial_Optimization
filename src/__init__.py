@@ -1,6 +1,7 @@
 def get_model(model_type_str: str): 
     from src.qubo.model import QuboModel 
-    models = [QuboModel]
+    from src.qap.model import QAPModel
+    models = [QuboModel, QAPModel]
     for model in models:
         if model.__name__ == model_type_str:
             return model
