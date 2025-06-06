@@ -12,7 +12,8 @@ from lightning.pytorch.loggers import WandbLogger
 
 from src import get_init_model
 from src.utils import load_hyperparameters 
-from src.lit import CSEQModel, QUBODataModule
+from src.lit import CSEQModel
+from src.qubo.datamodule import QUBODataModule
  
 class DOP_Supervised_Module(pl.LightningModule):
     """
@@ -145,31 +146,41 @@ class DOP_Supervised_Module(pl.LightningModule):
         
         return loss
  
-
-
-
-####         Trainer I --> Tensor_Trainer        ####### 
-# Tensor trainer is a pytorch lightning trainer where the dataset stores everything related to the CO problem of interest in vectors/matrices and not in some
-# some special graph format for GNNs or other special formats. Tensor trainers works for models like MLPs that operate on the feature vectors of a decision 
-# variable in a binary linear program. In this trainer "batch" is a list of vectors/matrices 
-# i.e UFLP dataset has batch that is fixed_costs, transportation_costs, opt_obj_values, opt_sol
+ 
 class Trainer(pl.Trainer):
-    """`pl.Trainer` for binary optimization problems."""
-    _datamodule_cls = QUBODataModule
+    """`pl.Trainer` for combinatorial optimization problems."""
     _module_cls = DOP_Supervised_Module
+    
+    # Registry mapping problem types to their datamodule classes
+    _datamodule_registry = {
+        "qubo": QUBODataModule,
+        # Add future datamodules here:
+        # "maxcut": MaxCutDataModule,
+        # "tsp": TSPDataModule,
+        # "vrp": VRPDataModule,
+    }
+    
     def __init__(self, hparams: dict, **kwargs):
         hparams_trainer: dict = deepcopy(hparams["trainer"])
         hparams_trainer.update(kwargs)
         super().__init__(**hparams_trainer)
 
+        # Dynamically determine the datamodule class
+        problem_type = hparams["dataset"]["problem_type"].lower()
+        if problem_type not in self._datamodule_registry:
+            raise ValueError(f"Unsupported problem type: {problem_type}. "
+                           f"Supported types: {list(self._datamodule_registry.keys())}")
+        
+        datamodule_cls = self._datamodule_registry[problem_type]
+
         # Set up the datamodule 
-        self._datamodule = self._datamodule_cls(hparams)
+        self._datamodule = datamodule_cls(hparams)
         self._datamodule.setup()
 
         # Set up the model
         self._module = self._module_cls(hparams, get_init_model(hparams, self._datamodule))
         
-        # Copy cache over from the datamodule class to the trainer because we need it during the forwarrd pass
+        # Copy cache over from the datamodule class to the trainer because we need it during the forward pass
         self._module.IMPROVE_CACHE = self._datamodule.IMPROVE_CACHE
         self._module.IMPROVE_CACHE_rw = self._datamodule.IMPROVE_CACHE_rw
 
