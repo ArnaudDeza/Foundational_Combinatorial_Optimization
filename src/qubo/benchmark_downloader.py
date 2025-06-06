@@ -18,7 +18,7 @@ def orlib(n: int, output_dir: str):
     name = f"bqp{n}.{'gz' if gz else 'txt'}"
     print(name)
     
-    orlib_dir = os.path.join(output_dir, 'orlib')
+    orlib_dir = os.path.join(output_dir, 'orlib', f'bqp_{n}')
     os.makedirs(orlib_dir, exist_ok=True)
 
     def process(infile: TextIO):
@@ -64,7 +64,7 @@ def palubeckis(n: int, index: int, density: int, seed: int, output_dir: str):
         return seed, seed / (coef + 1)
 
     print(f"p{n}.{index}")
-    palubeckis_dir = os.path.join(output_dir, 'palubeckis')
+    palubeckis_dir = os.path.join(output_dir, 'palubeckis', f'p_{n}')
     os.makedirs(palubeckis_dir, exist_ok=True)
     filepath = os.path.join(palubeckis_dir, f"p{n}.{index}")
     with open(filepath, mode="w") as outfile:
