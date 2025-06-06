@@ -58,8 +58,19 @@ def process_qubo_file(npy_file, time_limit, max_workers, gurobi_threads_per_solv
         The type of solver to use for the QUBO instances.
     """
     logging.info(f"Loading QUBOs from {npy_file}")
-    qubo_list = np.load(npy_file, allow_pickle=True)
+    qubo_data = np.load(npy_file, allow_pickle=True)
+    
+    # Check if the file contains a single matrix (from benchmarks) or a list of matrices (from synthetic generator)
+    if qubo_data.ndim == 2:
+        qubo_list = [qubo_data]  # Wrap the single matrix in a list
+    else:
+        qubo_list = qubo_data  # Assumes a list/3D array of matrices
+
     logging.info(f"Loaded {len(qubo_list)} QUBOs from {npy_file}")
+
+    if not qubo_list:
+        logging.warning(f"No QUBO instances found in {npy_file}. Skipping.")
+        return
 
     # Use Joblib's Parallel with a progress bar from tqdm
     results = Parallel(n_jobs=max_workers)(
