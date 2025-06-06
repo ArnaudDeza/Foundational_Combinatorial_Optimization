@@ -16,7 +16,7 @@ This command generates 1000 instances for QUBOs of size 50x50 and 100x100. Since
 
 ```bash
 python src/qubo/synthetic_generator.py \
-    --n_values 50 100 \
+    --n_values 10 2 \
     --num_instances 1000 \
     --output_folder ./data
 ```
@@ -41,10 +41,10 @@ For large `n`, you can split the generated instances into smaller files using th
 
 ```bash
 python src/qubo/synthetic_generator.py \
-    --n_values 200 \
-    --num_instances 10000 \
-    --output_folder ./data \
-    --partitions '200:10'
+    --n_values 20 \
+    --num_instances 5000 \
+    --output_folder /Users/adeza3/Summer_2025/Research/Foundational_Combinatorial_Optimization/data/qubo/synthetic \
+    --partitions '20:10'
 ```
 This will create 10 separate `.npy` files for the 10,000 instances of size 200x200.
 

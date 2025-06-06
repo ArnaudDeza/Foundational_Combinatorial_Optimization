@@ -1,0 +1,69 @@
+{
+    "dev": false,
+    "dataset": {
+      "folder": ["/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/dev/not_varying_density/data_n_10",
+                 "/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/dev/not_varying_density/data_n_20",
+                 "/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/dev/not_varying_density/data_n_30",
+                 "/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/dev/not_varying_density/data_n_40",
+                 "/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/dev/not_varying_density/data_n_50"
+                ],
+      "folder_real_world": "/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/rw/QUBOLIB/bqp",
+      "splits": [0.7, 0.1, 0.2],
+      "sparse_or_dense": "sparse",
+      "problem_type": "qubo",
+      "max_num_instances": 600000,
+      "max_num_instances_per_size": 100000,
+      "validate_on_real_world": true,
+      "real_world_folders":
+      [
+        "/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/rw/QUBOLIB/bqp_50",
+        "/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/rw/QUBOLIB/bqp_100",
+        "/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/rw/QUBOLIB/bqp_250",
+        "/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/rw/QUBOLIB/bqp_500",
+        "/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/rw/QUBOLIB/bqp_1000",
+        "/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/rw/QUBOLIB/bqp_2500",
+        "/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/rw/QUBOLIB/p_3000",
+        "/storage/home/hcoda1/3/adeza3/p-phentenryck3-1/adeza3/ML4QUBO/data/rw/QUBOLIB/p_7000"
+      ],
+      "rw_max_n":5000, 
+      "completely_unsupervised": false
+    },
+    "dataloader": {
+        "train": {"batch_size": 1024, "shuffle": true, "num_workers": 8, "persistent_workers": true,"pin_memory": true},
+        "val": {"batch_size": 1024, "shuffle": false, "num_workers": 3, "persistent_workers": true,"pin_memory": true},
+        "test": {"batch_size": 1024, "shuffle": false, "num_workers":4, "persistent_workers": true,"pin_memory": true}
+    },
+    "model": {
+        "type": "QuboModel", 
+        "alpha": 4.0,
+        "learning": "supervised",
+        "extractor":{
+            "n_features": 128,
+            "size_invariant_backbone": "dvn",
+            "depth": 40,
+            "activation1": "relu",
+            "activation2": "tanh",  
+            "use_layernorm": true
+        },
+        "classifier":{
+            "n_features" :128,
+            "n_classes": 2,
+            "use_layernorm": true,
+            "use_attention": true
+        }
+    },  
+    "optimizer": {
+        "name": "Adam",
+        "params": {"lr": 1e-3, "betas": [0.9, 0.999], "weight_decay": 0.001}
+    },
+    "lr_scheduler": { 
+        "name": "ExponentialLR",
+        "params": { "gamma": 0.975 }
+    },
+    "trainer": {
+        "accelerator": "auto", "devices": 1, "num_nodes": 1, "check_val_every_n_epoch": 5, "max_epochs": 150, "inference_mode": false, "num_sanity_val_steps": 0
+    },
+    "seeds": {
+        "weight_init": 2, "train_dataloader": 3424, "val_dataloader": 45354, "test_dataloader": 5, "split": 20
+    }
+}

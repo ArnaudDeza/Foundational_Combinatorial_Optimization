@@ -12,6 +12,8 @@ import multiprocessing
 import numpy as np
 import argparse
 import os
+import tempfile
+from io import TextIOWrapper
 
 def orlib(n: int, output_dir: str):
     gz = n >= 1000
@@ -24,13 +26,24 @@ def orlib(n: int, output_dir: str):
     def process(infile: TextIO):
         num = int(next(infile))
         for index in range(num):
-            filepath = os.path.join(orlib_dir, f"bqp{n}.{index + 1}")
-            with open(filepath, "w") as outfile:
-                _, nonzeros = map(int, next(infile).split())
-                print(n, file=outfile)
-                for i in range(nonzeros):
-                    j, i, q = map(int, next(infile).split())
-                    print(i - 1, j - 1, -q * (2 if j != i else 1), file=outfile)
+            base_name = f"bqp{n}.{index + 1}"
+            txt_filepath = os.path.join(orlib_dir, f"{base_name}.txt")
+            npy_filepath = os.path.join(orlib_dir, f"{base_name}.npy")
+
+            try:
+                with open(txt_filepath, "w") as outfile:
+                    _, nonzeros = map(int, next(infile).split())
+                    print(n, file=outfile)
+                    for _ in range(nonzeros):
+                        j, i, q = map(int, next(infile).split())
+                        print(i - 1, j - 1, -q * (2 if j != i else 1), file=outfile)
+                
+                Q = load_qubo_as_symmetric(txt_filepath)
+                np.save(npy_filepath, Q)
+                print(f"Saved {npy_filepath}")
+            finally:
+                if os.path.exists(txt_filepath):
+                    os.remove(txt_filepath)
 
     with urlopen(f"http://people.brunel.ac.uk/~mastjjb/jeb/orlib/files/{name}") as infile:
         if gz:
@@ -44,14 +57,27 @@ def gka(kind: str, index: int, output_dir: str):
     print(f"gka{index}{kind}")
     gka_dir = os.path.join(output_dir, 'gka')
     os.makedirs(gka_dir, exist_ok=True)
-    filepath = os.path.join(gka_dir, f"gka{index}{kind}")
-    with urlopen(f"http://biqmac.uni-klu.ac.at/library/biq/gka/gka{index}{kind}.sparse") as infile:
-        with open(filepath, "w") as outfile:
-            n, nonzeros = map(int, next(infile).split())
-            print(n, file=outfile)
-            for i in range(nonzeros):
-                j, i, q = map(int, next(infile).split())
-                print(i - 1, j - 1, q * (2 if j != i else 1), file=outfile)
+    
+    base_name = f"gka{index}{kind}"
+    txt_filepath = os.path.join(gka_dir, f"{base_name}.txt")
+    npy_filepath = os.path.join(gka_dir, f"{base_name}.npy")
+
+    try:
+        with urlopen(f"http://biqmac.uni-klu.ac.at/library/biq/gka/gka{index}{kind}.sparse") as infile:
+            with open(txt_filepath, "w") as outfile:
+                text_infile = TextIOWrapper(infile, encoding='utf-8')
+                n, nonzeros = map(int, next(text_infile).split())
+                print(n, file=outfile)
+                for _ in range(nonzeros):
+                    j, i, q = map(int, next(text_infile).split())
+                    print(i - 1, j - 1, q * (2 if j != i else 1), file=outfile)
+        
+        Q = load_qubo_as_symmetric(txt_filepath)
+        np.save(npy_filepath, Q)
+        print(f"Saved {npy_filepath}")
+    finally:
+        if os.path.exists(txt_filepath):
+            os.remove(txt_filepath)
 
 
 def palubeckis(n: int, index: int, density: int, seed: int, output_dir: str):
@@ -66,36 +92,61 @@ def palubeckis(n: int, index: int, density: int, seed: int, output_dir: str):
     print(f"p{n}.{index}")
     palubeckis_dir = os.path.join(output_dir, 'palubeckis', f'p_{n}')
     os.makedirs(palubeckis_dir, exist_ok=True)
-    filepath = os.path.join(palubeckis_dir, f"p{n}.{index}")
-    with open(filepath, mode="w") as outfile:
-        print(n, file=outfile)
-        for i in range(n):
-            seed, r = random(seed)
-            print(i, i, -int(floor(r * 201.0 - 100.0)), file=outfile)
-            for j in range(i + 1, n):
-                seed, fl = random(seed)
-                if fl * 100 <= density:
-                    seed, r = random(seed)
-                    print(j, i, -int(floor(r * 201.0 - 100.0)) * 2, file=outfile)
+
+    base_name = f"p{n}.{index}"
+    txt_filepath = os.path.join(palubeckis_dir, f"{base_name}.txt")
+    npy_filepath = os.path.join(palubeckis_dir, f"{base_name}.npy")
+    
+    try:
+        with open(txt_filepath, mode="w") as outfile:
+            print(n, file=outfile)
+            for i in range(n):
+                seed, r = random(seed)
+                print(i, i, -int(floor(r * 201.0 - 100.0)), file=outfile)
+                for j in range(i + 1, n):
+                    seed, fl = random(seed)
+                    if fl * 100 <= density:
+                        seed, r = random(seed)
+                        print(j, i, -int(floor(r * 201.0 - 100.0)) * 2, file=outfile)
+        
+        Q = load_qubo_as_symmetric(txt_filepath)
+        np.save(npy_filepath, Q)
+        print(f"Saved {npy_filepath}")
+    finally:
+        if os.path.exists(txt_filepath):
+            os.remove(txt_filepath)
 
 
 def stanford(index: int, output_dir: str):
     print(f"G{index}")
     stanford_dir = os.path.join(output_dir, 'stanford')
     os.makedirs(stanford_dir, exist_ok=True)
-    filepath = os.path.join(stanford_dir, f"G{index}")
-    with urlopen(f"https://web.stanford.edu/~yyye/yyye/Gset/G{index}") as infile:
-        n, nonzeros = map(int, next(infile).split())
-        diag = [0] * n
-        with open(filepath, mode="w") as outfile:
-            print(n, file=outfile)
-            for _ in range(nonzeros):
-                j, i, q = map(int, next(infile).split())
-                diag[i - 1] -= q
-                diag[j - 1] -= q
-                print(i - 1, j - 1, q * 2, file=outfile)
-            for i, q in enumerate(diag):
-                print(i, i, q, file=outfile)
+
+    base_name = f"G{index}"
+    txt_filepath = os.path.join(stanford_dir, f"{base_name}.txt")
+    npy_filepath = os.path.join(stanford_dir, f"{base_name}.npy")
+
+    try:
+        with urlopen(f"https://web.stanford.edu/~yyye/yyye/Gset/G{index}") as infile:
+            text_infile = TextIOWrapper(infile, encoding='utf-8')
+            n, nonzeros = map(int, next(text_infile).split())
+            diag = [0] * n
+            with open(txt_filepath, mode="w") as outfile:
+                print(n, file=outfile)
+                for _ in range(nonzeros):
+                    j, i, q = map(int, next(text_infile).split())
+                    diag[i - 1] -= q
+                    diag[j - 1] -= q
+                    print(i - 1, j - 1, q * 2, file=outfile)
+                for i, q in enumerate(diag):
+                    print(i, i, q, file=outfile)
+        
+        Q = load_qubo_as_symmetric(txt_filepath)
+        np.save(npy_filepath, Q)
+        print(f"Saved {npy_filepath}")
+    finally:
+        if os.path.exists(txt_filepath):
+            os.remove(txt_filepath)
 
 
 def optsicom(output_dir: str):
@@ -105,40 +156,63 @@ def optsicom(output_dir: str):
     with urlopen(f"http://grafo.etsii.urjc.es/optsicom/maxcut/set2.zip") as inzip:
         with ZipFile(BytesIO(inzip.read())) as inzipfile:
             for name in inzipfile.namelist():
-                with inzipfile.open(name) as infile:
-                    n, nonzeros = map(int, next(infile).split())
-                    diag = [0] * n
-                    filepath = os.path.join(optsicom_dir, name.split(".")[0])
-                    with open(filepath, mode="w") as outfile:
-                        print(n, file=outfile)
-                        for _ in range(nonzeros):
-                            j, i, q = map(int, next(infile).split())
-                            diag[i - 1] -= q
-                            diag[j - 1] -= q
-                            print(i - 1, j - 1, q * 2, file=outfile)
-                        for i, q in enumerate(diag):
-                            print(i, i, q, file=outfile)
+                base_name = name.split(".")[0]
+                txt_filepath = os.path.join(optsicom_dir, f"{base_name}.txt")
+                npy_filepath = os.path.join(optsicom_dir, f"{base_name}.npy")
+                
+                try:
+                    with inzipfile.open(name) as infile:
+                        text_infile = TextIOWrapper(infile, encoding='utf-8')
+                        n, nonzeros = map(int, next(text_infile).split())
+                        diag = [0] * n
+                        with open(txt_filepath, mode="w") as outfile:
+                            print(n, file=outfile)
+                            for _ in range(nonzeros):
+                                j, i, q = map(int, next(text_infile).split())
+                                diag[i - 1] -= q
+                                diag[j - 1] -= q
+                                print(i - 1, j - 1, q * 2, file=outfile)
+                            for i, q in enumerate(diag):
+                                print(i, i, q, file=outfile)
+
+                    Q = load_qubo_as_symmetric(txt_filepath)
+                    np.save(npy_filepath, Q)
+                    print(f"Saved {npy_filepath}")
+                finally:
+                    if os.path.exists(txt_filepath):
+                        os.remove(txt_filepath)
 
 
 def dimacs(index: int, output_dir: str):
     print(f"torus{index}")
     dimacs_dir = os.path.join(output_dir, 'dimacs')
     os.makedirs(dimacs_dir, exist_ok=True)
-    filepath = os.path.join(dimacs_dir, f"torus{index}")
-    with urlopen(f"http://dimacs.rutgers.edu/archive/Challenges/Seventh/Instances/TORUS/torus{index}.dat.gz") as infile:
-        with gzip.open(infile, mode="rt") as ingzip:
-            n, nonzeros = map(int, next(ingzip).split())
-            diag = [0] * n
-            with open(filepath, mode="w") as outfile:
-                print(n, file=outfile)
-                for _ in range(nonzeros):
-                    j, i, q = map(int, next(ingzip).split())
-                    diag[i - 1] -= q
-                    diag[j - 1] -= q
-                    print(i - 1, j - 1, q * 2, file=outfile)
-                for i, q in enumerate(diag):
-                    print(i, i, q, file=outfile)
+    
+    base_name = f"torus{index}"
+    txt_filepath = os.path.join(dimacs_dir, f"{base_name}.txt")
+    npy_filepath = os.path.join(dimacs_dir, f"{base_name}.npy")
 
+    try:
+        with urlopen(f"http://dimacs.rutgers.edu/archive/Challenges/Seventh/Instances/TORUS/torus{index}.dat.gz") as infile:
+            with gzip.open(infile, mode="rt") as ingzip:
+                n, nonzeros = map(int, next(ingzip).split())
+                diag = [0] * n
+                with open(txt_filepath, mode="w") as outfile:
+                    print(n, file=outfile)
+                    for _ in range(nonzeros):
+                        j, i, q = map(int, next(ingzip).split())
+                        diag[i - 1] -= q
+                        diag[j - 1] -= q
+                        print(i - 1, j - 1, q * 2, file=outfile)
+                    for i, q in enumerate(diag):
+                        print(i, i, q, file=outfile)
+        
+        Q = load_qubo_as_symmetric(txt_filepath)
+        np.save(npy_filepath, Q)
+        print(f"Saved {npy_filepath}")
+    finally:
+        if os.path.exists(txt_filepath):
+            os.remove(txt_filepath)
 
 
 def load_qubo_as_symmetric(filepath: str) -> np.ndarray:
