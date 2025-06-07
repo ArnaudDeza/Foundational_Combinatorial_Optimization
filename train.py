@@ -9,15 +9,20 @@ from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
 from lightning.pytorch.plugins.environments import SLURMEnvironment; SLURMEnvironment.detect = lambda: False
 import numpy as np
 from lightning.pytorch.loggers import WandbLogger 
+from abc import ABC, abstractmethod
 
 from src import get_init_model
 from src.utils import load_hyperparameters 
 from src.lit import CSEQModel
 from src.qubo.datamodule import QUBODataModule
+from src.qubo.train_module import QUBOModule
+from src.qap.datamodule import QAPDataModule
+from src.qap.train_module import QAPModule
  
-class DOP_Supervised_Module(pl.LightningModule):
+class DOP_Module(pl.LightningModule, ABC):
     """
-    DOP_Supervised_Module: Discrete Optimization Proxy Supervised Module
+    DOP_Module: Abstract base class for Discrete Optimization Proxy Modules
+    Contains common functionality shared across all CO problems.
     """
     def __init__(self, hparams: dict, model: CSEQModel):
         super().__init__()
@@ -30,9 +35,9 @@ class DOP_Supervised_Module(pl.LightningModule):
     def training_step(self, batch, _): 
         return self._step(batch, "train")
     def validation_step(self, batch, _, dataloader_idx): 
-        return self._step(batch, "val",dataloader_idx)
+        return self._step(batch, "val", dataloader_idx)
     def test_step(self, batch, stage, dataloader_idx):       
-        return self._step(batch, "test",dataloader_idx)
+        return self._step(batch, "test", dataloader_idx)
     
     def configure_optimizers(self):
         optimizer_config = self.hparams["optimizer"] 
@@ -69,95 +74,48 @@ class DOP_Supervised_Module(pl.LightningModule):
         if hasattr(self, 'IMPROVE_CACHE') and hasattr(self, 'IMPROVE_CACHE_rw'):
             self._move_cache_to_device(self.device)
 
-    def _step(self, batch, stage = None,dataloader_idx = None):
+    @abstractmethod
+    def _step(self, batch, stage=None, dataloader_idx=None):
         """
-        Shared logic for training/validation/test steps.
+        Abstract method for training/validation/test steps.
+        Must be implemented by problem-specific subclasses.
 
         Args:
-            batch: A tuple of (Q_sp_batch, sol_opt_sp_batch, mask_sp_batch, obj_batch, hash_id_batch)
+            batch: Problem-specific batch data
             stage: One of {"train", "val", "test"} indicating the current stage.
+            dataloader_idx: Index of the dataloader (for multiple dataloaders)
 
         Returns:
             loss (Tensor): Computed loss tensor for backpropagation.
         """
-        curr_device = batch[0].device
-        sync_dist = self.trainer.world_size > 1
+        pass
 
-        batch_len = len(batch)
-        if batch_len == 3:
-            Q, mask, hash_ids = batch 
-            have_opt_sols = False
-        else:
-            Q, opt_sols, mask, hash_ids, opt_obj = batch
-            have_opt_sols = True
- 
-        batch_size = Q.shape[0]
 
- 
-        if self.learning == "supervised":
-            loss, metrics  = self.model.supervised(Q, mask, opt_sols)
-        elif self.learning == "unsupervised_obj": 
-            loss, metrics  = self.model.unsupervised_obj(Q, mask)
-        elif self.learning == "unsupervised_GST":
-            hash_ids = hash_ids.detach().cpu().numpy().tolist()
- 
-            if stage in ["val","test"] and dataloader_idx > 0:
-                cache_objs = torch.tensor([self.IMPROVE_CACHE_rw[hash_id][1] for hash_id in hash_ids], dtype=torch.float32, device=curr_device)
-                cache_sols = torch.stack([self.IMPROVE_CACHE_rw[hash_id][0] for hash_id in hash_ids], dim = 0)
-            else:
-                cache_objs = torch.tensor([self.IMPROVE_CACHE[hash_id][1] for hash_id in hash_ids], dtype=torch.float32, device=curr_device)
-                cache_sols = torch.stack([self.IMPROVE_CACHE[hash_id][0] for hash_id in hash_ids], dim = 0)
 
-            loss, metrics,updated_cache_sols, updated_cache_objs  = self.model.gst_step(Q, mask, cache_sols, cache_objs)
-            # Update the cache with the new solutions and objectives 
-            if stage in ["val","test"] and dataloader_idx > 0:
-                for i, hash_id in enumerate(hash_ids): self.IMPROVE_CACHE_rw[hash_id] = [updated_cache_sols[i], updated_cache_objs[i]]
-            else:
-                for i, hash_id in enumerate(hash_ids): self.IMPROVE_CACHE[hash_id] = [updated_cache_sols[i], updated_cache_objs[i]]
-            
-        self.log(f"loss/{stage}_loss",  loss.detach(), on_epoch=True,on_step=stage == "train", prog_bar=True, batch_size=batch_size,sync_dist=sync_dist)
-        for k in ["accuracy", "f1_score", "precision", "recall"]:
-            if k in metrics:
-                self.log(f"classification_GUROBI/{stage}_{k}", metrics[k], on_epoch=True, on_step=False, prog_bar=False, batch_size=batch_size,sync_dist=sync_dist)
-        
-        self.log(f"Objective_{stage}/nn_mean_obj", torch.mean(metrics['objective_pred']), on_epoch=True, on_step=False, prog_bar=False, batch_size=batch_size,sync_dist=sync_dist)
-        
-        if have_opt_sols: 
-            self.log(f"Objective_{stage}/opt_mean_obj", torch.mean(opt_obj), on_epoch=True, on_step=False, prog_bar=False, batch_size=batch_size,sync_dist=sync_dist)
-        
-            # GAP Calculation
-            gap__NN_to_OPT = torch.abs(metrics["objective_pred"] - opt_obj) / torch.abs(opt_obj) * 100
-            self.log(f"gap_{stage}/mean_gap_NN_to_OPT", torch.mean(gap__NN_to_OPT), on_epoch=True, on_step=False, prog_bar=True,batch_size=batch_size,sync_dist=sync_dist)
-            self.log(f"gap_{stage}/max_gap_NN_to_OPT", torch.max(gap__NN_to_OPT), on_epoch=True, on_step=False, prog_bar=True,batch_size=batch_size,sync_dist=sync_dist)
-
-        if self.learning == "unsupervised_GST":
-            self.log(f"Objective_{stage}/Cache_mean_obj", torch.mean(metrics['obj_gst']), on_epoch=True, on_step=False, prog_bar=False, batch_size=batch_size,sync_dist=sync_dist)
-
-            # Compute the gap of NN to Cache
-            gap__NN_to_Cache = torch.abs(metrics["objective_pred"] - metrics["obj_gst"]) / torch.abs(metrics["obj_gst"]) * 100
-            self.log(f"gap_{stage}/mean_gap_NN_to_Cache", torch.mean(gap__NN_to_Cache), on_epoch=True, on_step=False, prog_bar=True,batch_size=batch_size,sync_dist=sync_dist)
-            self.log(f"gap_{stage}/max_gap_NN_to_Cache", torch.max(gap__NN_to_Cache), on_epoch=True, on_step=False, prog_bar=True,batch_size=batch_size,sync_dist=sync_dist)
-
-            if have_opt_sols:
-                # Compute the gap of Cache to OPT
-                gap__Cache_to_OPT = torch.abs(metrics["obj_gst"] - opt_obj) / torch.abs(opt_obj) * 100
-                self.log(f"gap_{stage}/mean_gap_Cache_to_OPT", torch.mean(gap__Cache_to_OPT), on_epoch=True, on_step=False, prog_bar=True,batch_size=batch_size,sync_dist=sync_dist)
-                self.log(f"gap_{stage}/max_gap_Cache_to_OPT", torch.max(gap__Cache_to_OPT), on_epoch=True, on_step=False, prog_bar=True,batch_size=batch_size,sync_dist=sync_dist)
-        
-        return loss
  
  
 class Trainer(pl.Trainer):
     """`pl.Trainer` for combinatorial optimization problems."""
-    _module_cls = DOP_Supervised_Module
     
-    # Registry mapping problem types to their datamodule classes
-    _datamodule_registry = {
-        "qubo": QUBODataModule,
-        # Add future datamodules here:
-        # "maxcut": MaxCutDataModule,
-        # "tsp": TSPDataModule,
-        # "vrp": VRPDataModule,
+    # Registry mapping problem types to their datamodule and module classes
+    _problem_registry = {
+        "qubo": {
+            "datamodule": QUBODataModule,
+            "module": QUBOModule,
+        },
+        "qap": {
+            "datamodule": QAPDataModule,
+            "module": QAPModule,
+        },
+        # Add future problems here:
+        # "maxcut": {
+        #     "datamodule": MaxCutDataModule,
+        #     "module": MaxCutModule,
+        # },
+        # "tsp": {
+        #     "datamodule": TSPDataModule,  
+        #     "module": TSPModule,
+        # },
     }
     
     def __init__(self, hparams: dict, **kwargs):
@@ -165,20 +123,22 @@ class Trainer(pl.Trainer):
         hparams_trainer.update(kwargs)
         super().__init__(**hparams_trainer)
 
-        # Dynamically determine the datamodule class
+        # Dynamically determine the datamodule and module classes
         problem_type = hparams["dataset"]["problem_type"].lower()
-        if problem_type not in self._datamodule_registry:
+        if problem_type not in self._problem_registry:
             raise ValueError(f"Unsupported problem type: {problem_type}. "
-                           f"Supported types: {list(self._datamodule_registry.keys())}")
+                           f"Supported types: {list(self._problem_registry.keys())}")
         
-        datamodule_cls = self._datamodule_registry[problem_type]
+        problem_config = self._problem_registry[problem_type]
+        datamodule_cls = problem_config["datamodule"]
+        module_cls = problem_config["module"]
 
         # Set up the datamodule 
         self._datamodule = datamodule_cls(hparams)
         self._datamodule.setup()
 
         # Set up the model
-        self._module = self._module_cls(hparams, get_init_model(hparams, self._datamodule))
+        self._module = module_cls(hparams, get_init_model(hparams, self._datamodule))
         
         # Copy cache over from the datamodule class to the trainer because we need it during the forward pass
         self._module.IMPROVE_CACHE = self._datamodule.IMPROVE_CACHE
