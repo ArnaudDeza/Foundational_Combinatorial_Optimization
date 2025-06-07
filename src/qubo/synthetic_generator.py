@@ -49,8 +49,8 @@ def generate_sparse_qubo(n: int, max_q_val: float, seed: int, num_samples: int,
 
 def save_qubo_instances_for_setting(n: int,
                                     num_instances: int,
-                                    max_q_val: float,
-                                    seed: int,
+                        max_q_val: float,
+                        seed: int,
                                     output_folder: str,
                                     density: Optional[float] = None,
                                     partitions: Optional[int] = None) -> None:
@@ -70,24 +70,24 @@ def save_qubo_instances_for_setting(n: int,
         folder_name = f"data_n_{n}_density_{density:.3f}"
         logging.info("Generating QUBO instances for n=%d, density=%.3f", n, density)
     else:
-        folder_name = f"data_n_{n}"
+                folder_name = f"data_n_{n}"
         logging.info("Generating QUBO instances for n=%d (fully dense)", n)
 
     instance_folder = os.path.join(output_folder, folder_name)
-    os.makedirs(instance_folder, exist_ok=True)
+            os.makedirs(instance_folder, exist_ok=True)
 
     Q_list = generate_sparse_qubo(n, max_q_val, seed, num_instances, density)
 
     if partitions:
         partitions_list = np.array_split(Q_list, partitions)
         for idx, partition_data in enumerate(partitions_list, start=1):
-            filename = os.path.join(instance_folder, f"Q_part_{idx}.npy")
+                    filename = os.path.join(instance_folder, f"Q_part_{idx}.npy")
             np.save(filename, partition_data)
-            logging.info("Saved partition %d for n=%d to %s", idx, n, filename)
-    else:
-        filename = os.path.join(instance_folder, "Q.npy")
-        np.save(filename, Q_list)
-        logging.info("Saved QUBO instances for n=%d to %s", n, filename)
+                    logging.info("Saved partition %d for n=%d to %s", idx, n, filename)
+            else:
+                filename = os.path.join(instance_folder, "Q.npy")
+                np.save(filename, Q_list)
+                logging.info("Saved QUBO instances for n=%d to %s", n, filename)
 
 
 def main() -> None:

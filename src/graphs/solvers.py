@@ -8,35 +8,16 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 import pickle
 import networkx as nx
-
-# Optional Gurobi import
-try:
-    import gurobipy as gp
-    from gurobipy import GRB
-    HAS_GUROBI = True
-except ImportError:
-    HAS_GUROBI = False
-    print("Warning: Gurobi not available. Solvers will not work without Gurobi license.")
-
-
+ 
+import gurobipy as gp
+from gurobipy import GRB
+ 
 # For parallel solving
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
-# Optional tqdm_joblib import
-try:
-    from tqdm_joblib import tqdm_joblib
-    HAS_TQDM_JOBLIB = True
-except ImportError:
-    HAS_TQDM_JOBLIB = False
-    def tqdm_joblib(tqdm_object):
-        # Simple context manager that does nothing
-        class DummyContext:
-            def __enter__(self):
-                return self
-            def __exit__(self, *args):
-                pass
-        return DummyContext()
+from tqdm_joblib import tqdm_joblib
+ 
 
 #from src import GRBENV
 # =============================================================================
@@ -51,12 +32,7 @@ class GraphProblemSolver(ABC):
         self.max_threads = max_threads
         self.quadratic = quadratic
         self.prm_file = prm_file
-
-    def _check_gurobi(self):
-        """Check if Gurobi is available."""
-        if not HAS_GUROBI:
-            raise ImportError("Gurobi is not available. Please install Gurobi and obtain a license.")
-
+ 
     @abstractmethod
     def solve(self, graph):
         """
@@ -69,8 +45,7 @@ class GraphProblemSolver(ABC):
 class MaxCutSolver(GraphProblemSolver):
     """Solver for the Max-Cut problem using a Gurobi formulation."""
 
-    def solve(self, graph):
-        self._check_gurobi()
+    def solve(self, graph): 
         m = gp.Model("max_cut")
         m.setParam("OutputFlag", 0)
         if self.time_limit is not None:

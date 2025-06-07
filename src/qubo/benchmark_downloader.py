@@ -32,11 +32,11 @@ def orlib(n: int, output_dir: str):
 
             try:
                 with open(txt_filepath, "w") as outfile:
-                    _, nonzeros = map(int, next(infile).split())
-                    print(n, file=outfile)
+                _, nonzeros = map(int, next(infile).split())
+                print(n, file=outfile)
                     for _ in range(nonzeros):
-                        j, i, q = map(int, next(infile).split())
-                        print(i - 1, j - 1, -q * (2 if j != i else 1), file=outfile)
+                    j, i, q = map(int, next(infile).split())
+                    print(i - 1, j - 1, -q * (2 if j != i else 1), file=outfile)
                 
                 Q = load_qubo_as_symmetric(txt_filepath)
                 np.save(npy_filepath, Q)
@@ -63,15 +63,15 @@ def gka(kind: str, index: int, output_dir: str):
     npy_filepath = os.path.join(gka_dir, f"{base_name}.npy")
 
     try:
-        with urlopen(f"http://biqmac.uni-klu.ac.at/library/biq/gka/gka{index}{kind}.sparse") as infile:
+    with urlopen(f"http://biqmac.uni-klu.ac.at/library/biq/gka/gka{index}{kind}.sparse") as infile:
             with open(txt_filepath, "w") as outfile:
                 text_infile = TextIOWrapper(infile, encoding='utf-8')
                 n, nonzeros = map(int, next(text_infile).split())
-                print(n, file=outfile)
+            print(n, file=outfile)
                 for _ in range(nonzeros):
                     j, i, q = map(int, next(text_infile).split())
-                    print(i - 1, j - 1, q * (2 if j != i else 1), file=outfile)
-        
+                print(i - 1, j - 1, q * (2 if j != i else 1), file=outfile)
+
         Q = load_qubo_as_symmetric(txt_filepath)
         np.save(npy_filepath, Q)
         print(f"Saved {npy_filepath}")
@@ -99,16 +99,16 @@ def palubeckis(n: int, index: int, density: int, seed: int, output_dir: str):
     
     try:
         with open(txt_filepath, mode="w") as outfile:
-            print(n, file=outfile)
-            for i in range(n):
-                seed, r = random(seed)
-                print(i, i, -int(floor(r * 201.0 - 100.0)), file=outfile)
-                for j in range(i + 1, n):
-                    seed, fl = random(seed)
-                    if fl * 100 <= density:
-                        seed, r = random(seed)
-                        print(j, i, -int(floor(r * 201.0 - 100.0)) * 2, file=outfile)
-        
+        print(n, file=outfile)
+        for i in range(n):
+            seed, r = random(seed)
+            print(i, i, -int(floor(r * 201.0 - 100.0)), file=outfile)
+            for j in range(i + 1, n):
+                seed, fl = random(seed)
+                if fl * 100 <= density:
+                    seed, r = random(seed)
+                    print(j, i, -int(floor(r * 201.0 - 100.0)) * 2, file=outfile)
+
         Q = load_qubo_as_symmetric(txt_filepath)
         np.save(npy_filepath, Q)
         print(f"Saved {npy_filepath}")
@@ -127,20 +127,20 @@ def stanford(index: int, output_dir: str):
     npy_filepath = os.path.join(stanford_dir, f"{base_name}.npy")
 
     try:
-        with urlopen(f"https://web.stanford.edu/~yyye/yyye/Gset/G{index}") as infile:
+    with urlopen(f"https://web.stanford.edu/~yyye/yyye/Gset/G{index}") as infile:
             text_infile = TextIOWrapper(infile, encoding='utf-8')
             n, nonzeros = map(int, next(text_infile).split())
-            diag = [0] * n
+        diag = [0] * n
             with open(txt_filepath, mode="w") as outfile:
-                print(n, file=outfile)
-                for _ in range(nonzeros):
+            print(n, file=outfile)
+            for _ in range(nonzeros):
                     j, i, q = map(int, next(text_infile).split())
-                    diag[i - 1] -= q
-                    diag[j - 1] -= q
-                    print(i - 1, j - 1, q * 2, file=outfile)
-                for i, q in enumerate(diag):
-                    print(i, i, q, file=outfile)
-        
+                diag[i - 1] -= q
+                diag[j - 1] -= q
+                print(i - 1, j - 1, q * 2, file=outfile)
+            for i, q in enumerate(diag):
+                print(i, i, q, file=outfile)
+
         Q = load_qubo_as_symmetric(txt_filepath)
         np.save(npy_filepath, Q)
         print(f"Saved {npy_filepath}")
@@ -161,19 +161,19 @@ def optsicom(output_dir: str):
                 npy_filepath = os.path.join(optsicom_dir, f"{base_name}.npy")
                 
                 try:
-                    with inzipfile.open(name) as infile:
+                with inzipfile.open(name) as infile:
                         text_infile = TextIOWrapper(infile, encoding='utf-8')
                         n, nonzeros = map(int, next(text_infile).split())
-                        diag = [0] * n
+                    diag = [0] * n
                         with open(txt_filepath, mode="w") as outfile:
-                            print(n, file=outfile)
-                            for _ in range(nonzeros):
+                        print(n, file=outfile)
+                        for _ in range(nonzeros):
                                 j, i, q = map(int, next(text_infile).split())
-                                diag[i - 1] -= q
-                                diag[j - 1] -= q
-                                print(i - 1, j - 1, q * 2, file=outfile)
-                            for i, q in enumerate(diag):
-                                print(i, i, q, file=outfile)
+                            diag[i - 1] -= q
+                            diag[j - 1] -= q
+                            print(i - 1, j - 1, q * 2, file=outfile)
+                        for i, q in enumerate(diag):
+                            print(i, i, q, file=outfile)
 
                     Q = load_qubo_as_symmetric(txt_filepath)
                     np.save(npy_filepath, Q)
@@ -193,20 +193,20 @@ def dimacs(index: int, output_dir: str):
     npy_filepath = os.path.join(dimacs_dir, f"{base_name}.npy")
 
     try:
-        with urlopen(f"http://dimacs.rutgers.edu/archive/Challenges/Seventh/Instances/TORUS/torus{index}.dat.gz") as infile:
-            with gzip.open(infile, mode="rt") as ingzip:
-                n, nonzeros = map(int, next(ingzip).split())
-                diag = [0] * n
+    with urlopen(f"http://dimacs.rutgers.edu/archive/Challenges/Seventh/Instances/TORUS/torus{index}.dat.gz") as infile:
+        with gzip.open(infile, mode="rt") as ingzip:
+            n, nonzeros = map(int, next(ingzip).split())
+            diag = [0] * n
                 with open(txt_filepath, mode="w") as outfile:
-                    print(n, file=outfile)
-                    for _ in range(nonzeros):
-                        j, i, q = map(int, next(ingzip).split())
-                        diag[i - 1] -= q
-                        diag[j - 1] -= q
-                        print(i - 1, j - 1, q * 2, file=outfile)
-                    for i, q in enumerate(diag):
-                        print(i, i, q, file=outfile)
-        
+                print(n, file=outfile)
+                for _ in range(nonzeros):
+                    j, i, q = map(int, next(ingzip).split())
+                    diag[i - 1] -= q
+                    diag[j - 1] -= q
+                    print(i - 1, j - 1, q * 2, file=outfile)
+                for i, q in enumerate(diag):
+                    print(i, i, q, file=outfile)
+
         Q = load_qubo_as_symmetric(txt_filepath)
         np.save(npy_filepath, Q)
         print(f"Saved {npy_filepath}")
