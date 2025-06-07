@@ -1,0 +1,80 @@
+{
+  "dev": false,
+  "seeds": {
+    "split": 42,
+    "train_dataloader": 42,
+    "val_dataloader": 42,
+    "test_dataloader": 42
+  },
+  "dataset": {
+    "problem_type": "qap",
+    "folder": ["data/synthetic/qap/0_1_N20_p0.7"],
+    "max_num_instances": 1000,
+    "max_num_instances_per_size": 100,
+    "completely_unsupervised": false,
+    "validate_on_real_world": false,
+    "real_world_folders": [],
+    "splits": [0.7, 0.15, 0.15],
+    "objective": "min"
+  },
+  "dataloader": {
+    "train": {
+      "batch_size": 32,
+      "shuffle": true,
+      "num_workers": 4,
+      "persistent_workers": true,
+      "pin_memory": true
+    },
+    "val": {
+      "batch_size": 64,
+      "shuffle": false,
+      "num_workers": 4,
+      "persistent_workers": true,
+      "pin_memory": true
+    },
+    "test": {
+      "batch_size": 64,
+      "shuffle": false,
+      "num_workers": 4,
+      "persistent_workers": true,
+      "pin_memory": true
+    }
+  },
+  "model": {
+    "type": "QAPModel",
+    "learning": "supervised",
+    "alpha": 1.0,
+    "fusion_mode": "concat",
+    "extractor": {
+      "size_invariant_backbone": "dvn",
+      "n_features": 64,
+      "depth": 3,
+      "activation2": "tanh",
+      "use_layernorm": true
+    },
+    "classifier": {
+      "use_layernorm": true,
+      "use_attention": false
+    }
+  },
+  "optimizer": {
+    "_target_": "torch.optim.Adam",
+    "lr": 0.001,
+    "weight_decay": 1e-5
+  },
+  "lr_scheduler": {
+    "_target_": "torch.optim.lr_scheduler.StepLR",
+    "step_size": 50,
+    "gamma": 0.5
+  },
+  "trainer": {
+    "max_epochs": 100,
+    "accelerator": "auto",
+    "devices": 1,
+    "log_every_n_steps": 10,
+    "check_val_every_n_epoch": 5,
+    "enable_checkpointing": true,
+    "enable_progress_bar": true,
+    "enable_model_summary": true
+  }
+}
